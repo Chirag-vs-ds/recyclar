@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#122b24">
+  <title>RecyclAR • Sort a little. Change a lot.</title>
+  <style>:root{font-family:system-ui,-apple-system,sans-serif;color:#edf7ef;background:#10231e;color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 20% 0%,#244e3c,transparent 65%);min-height:100dvh}canvas{display:block;position:fixed;inset:0;z-index:0}#overlay{position:fixed;inset:0;z-index:1;overflow:auto;pointer-events:none;padding:24px 18px}.card,.panel{pointer-events:auto}.card{width:min(100%,440px);margin:3vh auto;padding:28px;border:1px solid #ffffff20;border-radius:28px;background:#152d25;box-shadow:0 24px 80px #0004}.eyebrow{font-size:10px;letter-spacing:2px;color:#a6c5b5}.logo{font-size:68px;color:#a9ec91;margin:18px 0 0}h1{font-size:48px;letter-spacing:-2px;margin:0}h1 span,header strong span{color:#a9ec91}.subtitle{color:#b1c6ba;line-height:1.6}.legend{display:flex;gap:10px;margin:24px 0}.legend>div{flex:1;padding:16px 12px;border-radius:16px;font-size:10px;letter-spacing:1px}.legend strong{display:block;font-size:16px;margin:8px 0;letter-spacing:0}.legend small{display:block;letter-spacing:0;font-size:11px}.wet{background:#16623f;color:#fff}.dry{background:#205d9b;color:#fff}ol{padding-left:20px;line-height:1.9;color:#c5d6cc;font-size:14px}button{border:0;border-radius:14px;padding:15px 18px;font:600 15px system-ui;cursor:pointer;background:#b6f398;color:#12291b;touch-action:manipulation;min-height:48px}button:disabled{opacity:.45;cursor:default}button:focus-visible{outline:3px solid white;outline-offset:3px}#start,#place{width:100%}#support{font-size:12px;line-height:1.6;color:#b3c5ba}.card>small{font-size:11px;color:#90ac9c}.secondary{background:#ffffff14;color:white}#hud{position:absolute;inset:0;pointer-events:none;padding:max(14px,env(safe-area-inset-top)) 14px max(14px,env(safe-area-inset-bottom));display:flex;flex-direction:column;justify-content:space-between;gap:16px}.panel{background:#10251ee8;border:1px solid #ffffff24;border-radius:20px;padding:14px;backdrop-filter:blur(12px)}header{display:flex;align-items:center;justify-content:space-between;gap:10px}header strong{font-size:20px}header b{color:#b6f398;font-size:24px}#count{font-size:12px;margin-left:8px}header button{padding:8px 12px}.bottom{max-width:460px;width:100%;align-self:center}#status{font-weight:650;margin:0 0 8px;font-size:16px}#selection{color:#c0d3c6;font-size:13px;margin:0 0 14px}.row{display:flex;gap:10px}.row button{flex:1}.actions{margin-top:10px}.actions button{font-size:12px;min-height:40px;padding:10px}.bottom[data-tone=error]{border-color:#ff8686} .bottom[data-tone=success]{border-color:#b6f398}[hidden]{display:none!important}body.ar{background:transparent}@media(max-height:600px){.card{margin:0 auto;padding:20px}.logo{font-size:40px}.legend{margin:12px 0}.bottom{padding:10px}#selection{margin-bottom:8px}}
+</style>
+  <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"}}</script>
+</head>
+<body>
+  <div id="overlay">
+    <main id="welcome" class="card">
+      <div class="eyebrow">A SMALL GAME. A GREENER WORLD.</div>
+      <div class="logo" aria-hidden="true">♻</div>
+      <h1>Recycl<span>AR</span></h1>
+      <p class="subtitle">Turn your space into a sorting station.</p>
+      <div class="legend"><div class="wet">GREEN BIN<br><strong>Wet waste</strong><small>Food scraps & leaves</small></div><div class="dry">BLUE BIN<br><strong>Dry waste</strong><small>Clean paper & packaging</small></div></div>
+      <ol><li>Scan a clear floor or tabletop.</li><li>Place your virtual sorting station.</li><li>Tap an item, then tap its correct bin.</li></ol>
+      <button id="start" disabled>Checking AR support…</button>
+      <button id="demo" class="secondary" style="width:100%;margin-top:10px">Open laptop demo</button>
+      <p style="font-size:12px;color:#b3c5ba">Presentation: open Laptop demo, click an object, then its bin. Try one wrong answer, then correct it. Use Restart to repeat. Internet is needed to load Three.js. Live AR requires hosting this page over HTTPS.</p>
+      <p id="support" role="status">Requires Android Chrome, ARCore support and HTTPS.</p>
+      <small>6 objects · 10 points each · No app install</small>
+    </main>
+    <div id="hud" hidden>
+      <header class="panel"><strong>Recycl<span>AR</span><small id="mode" style="display:block;font-size:10px;letter-spacing:1px">LIVE AR</small></strong><div><b id="score">0</b> pts <span id="count">0 / 6</span></div><button id="exit" class="secondary">Exit</button></header>
+      <div class="bottom panel">
+        <p id="status" role="status" aria-live="polite">Move your phone slowly over a surface.</p>
+        <p id="selection">Find a textured, well-lit horizontal surface.</p>
+        <button id="place" disabled>Looking for a surface…</button>
+        <div id="choices" class="row" hidden><button id="wet" class="wet" disabled>Green · Wet</button><button id="dry" class="dry" disabled>Blue · Dry</button></div>
+        <div class="row actions"><button id="restart" class="secondary">Restart</button><button id="rescan" class="secondary">Move station</button></div>
+      </div>
+    </div>
+  </div>
+  <script type="module">import * as THREE from 'three';
+// Pure game rules: deliberately independent of the camera and renderer.
+const ITEMS = [
+  { id: 'apple', name: 'Apple core', type: 'wet', tip: 'Food scraps belong in the wet bin.' },
+  { id: 'leaf', name: 'Fallen leaf', type: 'wet', tip: 'Leaves are biodegradable wet waste.' },
+  { id: 'peel', name: 'Orange peel', type: 'wet', tip: 'Fruit peels belong in the wet bin.' },
+  { id: 'bottle', name: 'Empty plastic bottle', type: 'dry', tip: 'Empty, clean plastic packaging belongs in the dry bin.' },
+  { id: 'paper', name: 'Clean paper', type: 'dry', tip: 'Clean, dry paper belongs in the dry bin.' },
+  { id: 'can', name: 'Empty metal can', type: 'dry', tip: 'Empty, clean metal cans belong in the dry bin.' }
+];
+function newGame() { return { score: 0, sorted: [], mistakes: 0 }; }
+function sortItem(state, id, bin) {
+  const item = ITEMS.find(item => item.id === id);
+  if (!item || !['wet', 'dry'].includes(bin) || state.sorted.includes(id)) return { state, correct: false, ignored: true };
+  if (item.type !== bin) return { state: { ...state, mistakes: state.mistakes + 1 }, correct: false, ignored: false };
+  return { state: { ...state, score: state.score + 10, sorted: [...state.sorted, id] }, correct: true, ignored: false };
+}
+
+function mesh(geometry, color, x=0, y=0, z=0) {
+  const object = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color, roughness: .65 }));
+  object.position.set(x,y,z); return object;
+}
+function label(text, width=.22) {
+  const canvas=document.createElement('canvas'); canvas.width=512;canvas.height=128;
+  const ctx=canvas.getContext('2d');ctx.fillStyle='#122b24';ctx.fillRect(0,0,512,128);ctx.fillStyle='white';ctx.font='bold 42px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,256,64);
+  const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
+  const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,depthTest:true}));sprite.scale.set(width,width/4,1);return sprite;
+}
+function makeBin(type,x) {
+  const bin=new THREE.Group();bin.position.set(x,0,-.14);bin.userData={kind:'bin',type};
+  const color=type==='wet'?0x23a966:0x2785df;
+  bin.add(mesh(new THREE.CylinderGeometry(.095,.075,.23,20,1,true),color,0,.135));
+  bin.add(mesh(new THREE.CylinderGeometry(.075,.075,.015,20),color,0,.022));
+  const rim=mesh(new THREE.TorusGeometry(.095,.009,8,24),color,0,.25);rim.rotation.x=Math.PI/2;bin.add(rim);
+  const sign=label(type==='wet'?'GREEN / WET':'BLUE / DRY');sign.position.y=.32;bin.add(sign);
+  // Transparent solid hit volume makes the open bin easy to tap.
+  const target=mesh(new THREE.CylinderGeometry(.11,.09,.28,12),color,0,.14);target.material.visible=false;bin.add(target);
+  return bin;
+}
+function makeWaste(item,index) {
+  const group=new THREE.Group();group.userData={kind:'waste',id:item.id};
+  group.position.set((index%3-1)*.17,.065,.12+Math.floor(index/3)*.16);
+  if(item.id==='apple') {
+    group.add(mesh(new THREE.SphereGeometry(.04,16,12),0xe34e41));
+    group.add(mesh(new THREE.CylinderGeometry(.006,.007,.035,8),0x775236,0,.045));
+  } else if(item.id==='leaf') {
+    const leaf=mesh(new THREE.SphereGeometry(.045,12,8),0x69b645);leaf.scale.set(.6,.12,1.3);leaf.rotation.z=.2;group.add(leaf);
+    group.add(mesh(new THREE.CylinderGeometry(.002,.002,.08,6),0x49662a,0,.004));group.children[1].rotation.x=Math.PI/2;
+  } else if(item.id==='peel') {
+    const peel=mesh(new THREE.TorusGeometry(.035,.012,8,18,Math.PI*1.5),0xffa12b);peel.rotation.x=Math.PI/2;group.add(peel);
+  } else if(item.id==='bottle') {
+    group.add(mesh(new THREE.CylinderGeometry(.024,.024,.075,12),0x8edce7));
+    group.add(mesh(new THREE.CylinderGeometry(.012,.024,.02,12),0x8edce7,0,.047));
+    group.add(mesh(new THREE.CylinderGeometry(.013,.013,.018,12),0x2376ca,0,.066));
+  } else if(item.id==='paper') {
+    const paper=mesh(new THREE.BoxGeometry(.085,.006,.065),0xfff5d8);paper.rotation.y=.2;group.add(paper);
+    for(let i=0;i<3;i++)group.add(mesh(new THREE.BoxGeometry(.05,.001,.002),0x79948f,0,.004,(i-1)*.012));
+  } else {
+    group.add(mesh(new THREE.CylinderGeometry(.028,.028,.075,16),0xc5ced2));
+    group.add(mesh(new THREE.CylinderGeometry(.029,.029,.006,16),0x778e9d,0,.04));
+  }
+  const halo=new THREE.Mesh(new THREE.RingGeometry(.05,.057,24).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:0xb6f398,side:THREE.DoubleSide}));halo.position.y=-.052;halo.visible=false;halo.name='halo';group.add(halo);
+  const target=mesh(new THREE.SphereGeometry(.06,8,6),0xffffff);target.material.visible=false;group.add(target);
+  return group;
+}
+function disposeGroup(group) {
+  group.traverse(object=>{object.geometry?.dispose();if(object.material){object.material.map?.dispose();object.material.dispose();}});
+  group.clear();
+}
+
+
+const $=id=>document.getElementById(id);
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+renderer.xr.enabled=true;renderer.xr.setReferenceSpaceType('local');
+document.body.prepend(renderer.domElement);
+const scene=new THREE.Scene(); // Null background: the XR compositor supplies the real camera image.
+const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.01,30);
+scene.add(new THREE.HemisphereLight(0xffffff,0x6e856c,2));
+const light=new THREE.DirectionalLight(0xffffff,2);light.position.set(1,3,2);scene.add(light);
+const station=new THREE.Group();station.visible=false;scene.add(station);
+const reticle=new THREE.Mesh(new THREE.RingGeometry(.07,.085,32).rotateX(-Math.PI/2),new THREE.MeshBasicMaterial({color:0xb6f398}));
+reticle.matrixAutoUpdate=false;reticle.visible=false;scene.add(reticle);
+const raycaster=new THREE.Raycaster(),matrix=new THREE.Matrix4(),normal=new THREE.Vector3();
+let session=null,hitSource=null,placed=false,selected=null,state=newGame(),animation=null,flashUntil=0;
+let waste=[],bins=[],tracking=false;
+let demoMode=false;
+const demoGrid=new THREE.GridHelper(3,30,0x49665b,0x263e34);demoGrid.visible=false;scene.add(demoGrid);
+function status(text,tone='neutral') { $('status').textContent=text;document.querySelector('.bottom').dataset.tone=tone; }
+function sync() {
+  $('score').textContent=state.score;$('count').textContent=`${state.sorted.length} / ${ITEMS.length}`;
+  $('wet').disabled=$('dry').disabled=!selected||!!animation||!tracking;
+  $('selection').textContent=selected?`Selected: ${ITEMS.find(i=>i.id===selected.userData.id).name}`:placed?'Tap a 3D waste object, then a bin. You can also use the bin buttons.':'Find a textured, well-lit horizontal surface.';
+}
+function resetRound() {
+  animation=null;selected=null;flashUntil=0;state=newGame();disposeGroup(station);
+  bins=[makeBin('wet',-.18),makeBin('dry',.18)];waste=ITEMS.map(makeWaste);station.add(...bins,...waste);sync();
+  status(placed?'New round! Tap any waste object.':'Move your phone slowly over a floor or tabletop.');
+}
+function scan() {
+  placed=false;station.visible=false;reticle.visible=false;$('place').hidden=false;$('place').disabled=true;$('choices').hidden=true;resetRound();
+}
+function place() {
+  if(!session||!tracking||!reticle.visible||placed)return;
+  station.position.setFromMatrixPosition(reticle.matrix);
+  // Keep bins upright and face their front toward the user, independent of hit-pose yaw.
+  const eye=new THREE.Vector3().setFromMatrixPosition(renderer.xr.getCamera().matrixWorld);
+  station.rotation.set(0,Math.atan2(eye.x-station.position.x,eye.z-station.position.z),0);
+  placed=true;station.visible=true;reticle.visible=false;$('place').hidden=true;$('choices').hidden=false;
+  status('Station placed. Tap an object to select it.');sync();
+}
+function choose(object) {
+  selected?.getObjectByName('halo')?.visible && (selected.getObjectByName('halo').visible=false);
+  selected=object;selected.getObjectByName('halo').visible=true;status('Now tap the correct bin.');sync();
+}
+function sort(type) {
+  if(!selected||animation||!tracking)return;
+  const item=ITEMS.find(i=>i.id===selected.userData.id),result=sortItem(state,item.id,type);
+  if(result.ignored)return;
+  state=result.state;
+  if(!result.correct){status(`Try again! ${item.tip}`,'error');selected.getObjectByName('halo').material.color.set(0xff6565);flashUntil=performance.now()+900;sync();return;}
+  status(`+10 · ${item.name} sorted!`,'success');
+  const bin=bins.find(b=>b.userData.type===type);
+  animation={object:selected,from:selected.position.clone(),to:bin.position.clone().add(new THREE.Vector3(0,.12,0)),start:performance.now()};sync();
+}
+function onSelect(event) {
+  if(!placed||animation||!tracking)return;
+  // Use the transient touchscreen input pose from THIS event, not a stale controller pose.
+  const pose=event.frame.getPose(event.inputSource.targetRaySpace,renderer.xr.getReferenceSpace());if(!pose)return;
+  matrix.fromArray(pose.transform.matrix);raycaster.ray.origin.setFromMatrixPosition(matrix);
+  raycaster.ray.direction.set(0,0,-1).transformDirection(matrix);scene.updateMatrixWorld(true);
+  const hits=raycaster.intersectObjects([...bins,...waste.filter(w=>w.visible)],true);
+  for(const hit of hits){let object=hit.object;while(object&& !object.userData.kind)object=object.parent;if(!object)continue;if(object.userData.kind==='waste')choose(object);else if(selected)sort(object.userData.type);else status('Tap a waste object first.');break;}
+}
+// Stop taps on HTML controls also selecting objects behind those controls.
+document.querySelectorAll('.panel').forEach(panel=>panel.addEventListener('beforexrselect',event=>event.preventDefault()));
+$('place').onclick=place;$('restart').onclick=resetRound;$('rescan').onclick=scan;
+$('wet').onclick=()=>sort('wet');$('dry').onclick=()=>sort('dry');$('exit').onclick=()=>demoMode?cleanup():session?.end();
+// Explicit desktop teaching mode. It never pretends to detect real surfaces.
+$('demo').onclick=()=>{
+  demoMode=true;tracking=true;placed=true;station.position.set(0,0,0);station.rotation.set(0,0,0);
+  camera.position.set(.68,.95,1.05);camera.lookAt(0,.04,.05);camera.updateMatrixWorld();
+  scene.background=new THREE.Color(0x10231e);demoGrid.visible=true;station.visible=true;
+  $('welcome').hidden=true;$('hud').hidden=false;$('place').hidden=true;$('choices').hidden=false;$('rescan').hidden=true;
+  $('mode').textContent='3D DEMO · NO CAMERA';resetRound();status('Laptop demo: click an object, then its bin.');
+};
+renderer.domElement.addEventListener('pointerdown',event=>{
+  if(!demoMode||animation)return;
+  const rect=renderer.domElement.getBoundingClientRect();
+  raycaster.setFromCamera(new THREE.Vector2((event.clientX-rect.left)/rect.width*2-1,-(event.clientY-rect.top)/rect.height*2+1),camera);
+  scene.updateMatrixWorld(true);
+  const hits=raycaster.intersectObjects([...bins,...waste.filter(w=>w.visible)],true);
+  for(const hit of hits){let object=hit.object;while(object&&!object.userData.kind)object=object.parent;if(!object)continue;if(object.userData.kind==='waste')choose(object);else if(selected)sort(object.userData.type);else status('Click a waste object first.');break;}
+});
+function cleanup() {
+  demoMode=false;demoGrid.visible=false;scene.background=null;$('rescan').hidden=false;$('mode').textContent='LIVE AR';
+  hitSource?.cancel();hitSource=null;session=null;tracking=false;placed=false;animation=null;selected=null;
+  station.visible=false;reticle.visible=false;disposeGroup(station);waste=[];bins=[];
+  document.body.classList.remove('ar');$('hud').hidden=true;$('welcome').hidden=false;checkSupport();
+}
+$('start').onclick=async()=>{
+  $('start').disabled=true;let started=null;
+  try {
+    started=await navigator.xr.requestSession('immersive-ar',{requiredFeatures:['hit-test','dom-overlay'],domOverlay:{root:$('overlay')}});
+    session=started;started.addEventListener('end',cleanup,{once:true});started.addEventListener('select',onSelect);
+    document.body.classList.add('ar');$('welcome').hidden=true;$('hud').hidden=false;
+    await renderer.xr.setSession(started);
+    const viewer=await started.requestReferenceSpace('viewer');
+    const source=await started.requestHitTestSource({space:viewer});
+    if(session!==started){source.cancel();return;}hitSource=source;scan();
+  }catch(error){if(started){try{await started.end();}catch{} }cleanup();$('support').textContent=`AR could not start (${error.name}). Allow camera/AR access, use Android Chrome, update Google Play Services for AR, and open this page directly over HTTPS. This game requires hit-test and DOM overlay support.`;}
+};
+renderer.setAnimationLoop((time,frame)=>{
+  if(frame&&session){
+    const space=renderer.xr.getReferenceSpace();const wasTracking=tracking;
+    tracking=!!frame.getViewerPose(space)&&session.visibilityState==='visible';
+    station.visible=placed&&tracking;
+    if(!tracking){reticle.visible=false;$('place').disabled=true;status('Tracking paused. Point back at your surface.');}
+    else if(!wasTracking){status(placed?'Tracking restored. Continue sorting.':'Move slowly until the green ring appears.');}
+    if(!placed&&tracking&&hitSource){
+      reticle.visible=false;
+      for(const hit of frame.getHitTestResults(hitSource)){
+        const pose=hit.getPose(space);if(!pose)continue;matrix.fromArray(pose.transform.matrix);
+        normal.set(0,1,0).transformDirection(matrix);
+        // Accept upward horizontal surfaces only (within about 20 degrees).
+        if(normal.y<.94)continue;reticle.matrix.copy(matrix);reticle.visible=true;break;
+      }
+      $('place').disabled=!reticle.visible;$('place').textContent=reticle.visible?'Place station here':'Looking for a surface…';
+    }
+    if(wasTracking!==tracking)sync();
+  }
+  if(animation){const t=Math.min((performance.now()-animation.start)/650,1),a=animation;
+    a.object.position.lerpVectors(a.from,a.to,t);a.object.position.y+=Math.sin(t*Math.PI)*.18;a.object.scale.setScalar(1-.65*t);
+    if(t===1){a.object.visible=false;selected=null;animation=null;sync();if(state.sorted.length===ITEMS.length)status(`All sorted! ${state.score}/60 points · ${state.mistakes} incorrect attempts. Play again?`,'success');}}
+  if(flashUntil&&performance.now()>flashUntil){selected?.getObjectByName('halo')?.material.color.set(0xb6f398);flashUntil=0;}
+  renderer.render(scene,camera);
+});
+window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+async function checkSupport(){
+  let message;
+  if(!window.isSecureContext)message='HTTPS is required on your phone. Deploy this folder or use USB localhost forwarding.';
+  else if(!navigator.xr)message='WebXR is unavailable. Open this page in Chrome on an ARCore-supported Android phone.';
+  else {try{if(await navigator.xr.isSessionSupported('immersive-ar')){$('start').disabled=false;$('start').textContent='Start AR game';$('support').textContent='AR is available. Allow camera access when prompted.';return;}message='Immersive AR is not supported here. Try an ARCore-supported Android phone with Google Play Services for AR.';}catch{message='AR support check failed. Open this page directly in Android Chrome and reload.';}}
+  $('support').textContent=message;$('start').textContent='AR unavailable on this device';
+}
+checkSupport();
+</script>
+</body>
+</html>
+
