@@ -2,6 +2,12 @@
 
 A small, genuine browser AR waste-sorting practical using JavaScript, Three.js and WebXR. No Unity, paid API, backend database, build step or model downloads. Three.js is loaded from a pinned CDN URL; internet access is required.
 
+## 🌐 Play it in your browser
+
+> **[▶ Open RecyclAR Demo](https://chirag-vs-ds.github.io/recyclar/RecyclAR_Demo.html)**
+>
+> Works on any device — no app install required. For the full Live AR experience, open on Android Chrome.
+
 ## Screenshots
 
 <p align="center">
