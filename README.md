@@ -2,6 +2,14 @@
 
 A small, genuine browser AR waste-sorting practical using JavaScript, Three.js and WebXR. No Unity, paid API, backend database, build step or model downloads. Three.js is loaded from a pinned CDN URL; internet access is required.
 
+## Screenshots
+
+<p align="center">
+  <img src="screenshots/welcome-screen.jpg" width="300" alt="RecyclAR Welcome Screen" />
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="screenshots/live-ar-gameplay.jpg" width="300" alt="RecyclAR Live AR Gameplay" />
+</p>
+
 ## What is included
 
 - Real-world horizontal surface detection using WebXR hit testing.
